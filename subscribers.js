@@ -1,10 +1,8 @@
-axios.defaults.headers.common['access-password'] = 'testpassword';
-
 /**
  * Subscribers Class.
  * Used to draw get subscribers from Server and draw the subscribers table.
  */
-class SubscribersTable {
+ class SubscribersTable {
   #table_container = null;
   #todays_control = null;
   #search_field = null;
@@ -17,6 +15,8 @@ class SubscribersTable {
   static API_URL = 'https://prod.formatika-api.net.ru/api/v1';
 
   constructor() {
+    axios.defaults.headers.common['access-password'] = prompt('Введите пароль менеджера')
+    
     this.#search_field = document.getElementById('search');
     this.#search_field.addEventListener('input', this.search.bind(this));
     this.#table_container = document.getElementsByClassName('subscribers')[0];
@@ -33,9 +33,13 @@ class SubscribersTable {
     }
   }
 
+  /** 
+   * Make API call to get all subscribers. 
+   * @return {Object[]} Array of Subscriber objects. 
+   */
   getSubscribers() {
     axios({
-      url: '/subscribers/',
+      url: '/subscribers',
       baseURL: SubscribersTable.API_URL,
       method: 'get'
     }).then((response) => {
@@ -68,16 +72,23 @@ class SubscribersTable {
     })
   }
 
+  /**
+   * Apply filter by email for search through subscribers.
+   * @param {event} e 
+   */
   search(e) {
     if (e.target.value.trim().length > 0) {
       this.#search_request = e.target.value.trim();
     } else {
       this.#search_request = null;
     }
-
     this.render();
   }
 
+  /**
+   * Colelcts all subscribers with specific email.
+   * @returns {Subscriber[]} Subscribers with searched email.
+   */
   searchSubscribers() {
     const filtered = this.#subscribers.filter((sub) => {
       return sub.email.toLowerCase().indexOf(this.#search_request.toLowerCase()) >= 0;
@@ -85,6 +96,9 @@ class SubscribersTable {
     return filtered;
   }
 
+  /**
+   * Toggle filter to display users subscribed at today date.
+   */
   toggleTodays() {
     this.#is_todays = !this.#is_todays;
     if (this.#is_todays) {
@@ -150,6 +164,9 @@ class Subscriber {
     this.#dom_container.className = 'subscriber';
   }
 
+  /**
+   * Calls API method to cancel subscription by user email.
+   */
   cancelSubscription() {
     axios({
       url: '/subscribers/cancel',
