@@ -5,17 +5,19 @@
  class SubscribersTable {
   #table_container = null;
   #todays_control = null;
+  #active_control = null;
   #search_field = null;
 
   #search_request = null;
   #is_todays = false;
+  #is_only_actives = true;
 
   #subscribers = [];
 
   static API_URL = 'https://prod.formatika-api.net.ru/api/v1';
 
   constructor() {
-    axios.defaults.headers.common['access-password'] = prompt('Введите пароль менеджера')
+    axios.defaults.headers.common['access-password'] = this.getPassword() || prompt('Введите пароль менеджера') 
     
     this.#search_field = document.getElementById('search');
     this.#search_field.addEventListener('input', this.search.bind(this));
@@ -26,11 +28,40 @@
       this.#todays_control.addEventListener('click', this.toggleTodays.bind(this));
     }
 
+    this.#active_control = document.getElementsByClassName('active-only')[0];
+    if (this.#active_control) {
+      this.#active_control.addEventListener('click', this.toggleActives.bind(this));
+    }
+
     if (!this.#table_container) {
       console.error('Cannot find .subscribers element in the DOM');
     } else {
       this.getSubscribers();
     }
+  }
+
+  /**
+   * Save entered manager password to localStorage
+   * @return {String} Saved password
+   */
+  savePassword(password) {
+    localStorage.setItem('access-password', password);
+    return password;
+  }
+
+  /**
+   * Get saved password.
+   * @return {String} password.
+   */
+  getPassword() {
+    return localStorage.getItem('access-password');
+  }
+
+  /**
+   * Remove saved password.
+   */
+  clearPassword() {
+    localStorage.removeItem('access-password');
   }
 
   /** 
@@ -40,14 +71,23 @@
   getSubscribers() {
     axios({
       url: '/subscribers',
+      params: {include_inactive: !this.#is_only_actives},
       baseURL: SubscribersTable.API_URL,
       method: 'get'
     }).then((response) => {
       if (response.status === 200) {
+        this.#subscribers = [];
         response.data.forEach((sub) => {
           this.#subscribers.push(new Subscriber(sub));
         });
         this.render();
+
+        // Save password for future log-in.
+        if (axios.defaults.headers.common['access-password'] 
+          && axios.defaults.headers.common['access-password'].length > 0) {
+          this.savePassword(axios.defaults.headers.common['access-password']);
+        }
+
       } else {
         alert('Не удалось загрузить подписчиков.');
         console.log(response);
@@ -56,6 +96,12 @@
       if (error.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
+        if (error.response.data.detail) {
+          alert(error.response.data.detail);
+        }
+        if (error.response.status === 403) {
+
+        }
         console.log(error.response.data);
         console.log(error.response.status);
         console.log(error.response.headers);
@@ -91,7 +137,8 @@
    */
   searchSubscribers() {
     const filtered = this.#subscribers.filter((sub) => {
-      return sub.email.toLowerCase().indexOf(this.#search_request.toLowerCase()) >= 0;
+      return sub.email.toLowerCase().indexOf(this.#search_request.toLowerCase()) >= 0 
+        || sub.name.toLowerCase().indexOf(this.#search_request.toLowerCase()) >= 0;
     });
     return filtered;
   }
@@ -102,13 +149,28 @@
   toggleTodays() {
     this.#is_todays = !this.#is_todays;
     if (this.#is_todays) {
-      this.#todays_control.className = 'todays-only active';
+      this.#todays_control.classList.add('active');
       this.#todays_control.getElementsByClassName('material-icons')[0].innerHTML = 'check_box';
     } else {
-      this.#todays_control.className = 'todays-only';
+      this.#todays_control.classList.remove('active');
       this.#todays_control.getElementsByClassName('material-icons')[0].innerHTML = 'check_box_outline_blank';
     }
     this.render();
+  }
+
+  /**
+   * Toggle filter to display users with inactive subscription.
+   */
+  toggleActives() {
+    this.#is_only_actives = !this.#is_only_actives;
+    if (this.#is_only_actives) {
+      this.#active_control.classList.add('active');
+      this.#active_control.getElementsByClassName('material-icons')[0].innerHTML = 'check_box';
+    } else {
+      this.#active_control.classList.remove('active');
+      this.#active_control.getElementsByClassName('material-icons')[0].innerHTML = 'check_box_outline_blank';
+    }
+    this.getSubscribers();
   }
 
   getTodays(subs) {
@@ -225,7 +287,7 @@ class Subscriber {
 
     const charge = document.createElement('div');
     charge.className = 'subscriber--cell-action noselect' + (this.#is_paid ? ' paid' : '');
-    charge.innerHTML = '<span class="material-icons md-18 md-blue">local_atm</span>';
+    charge.innerHTML = '<span class="material-icons md-18 md-blue">' + (this.#is_paid ? 'price_check' : 'local_atm') + '</span>';
 
     if (!this.#is_paid) {
       charge.addEventListener('click', this.showChargeDialog.bind(this));
@@ -321,6 +383,10 @@ class Subscriber {
 
   get email() {
     return this.#email;
+  }
+
+  get name() {
+    return this.#name;
   }
 
   /**
