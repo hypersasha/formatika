@@ -417,7 +417,11 @@ class Subscriber {
               }
             }
           }).catch(error => {
-            alert('Не удалось завершить оплату.')
+            if (error.response.data.detail) {
+              alert(error.response.data.detail)
+            } else {
+              alert('Неизвестная ошибка при списании средств.')
+            }
           })
 
           destroyConfirm();
